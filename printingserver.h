@@ -88,6 +88,14 @@ private:
     //                                      GET_INFO PRINTER NAME {CATEGORY, CONNECTION_STATE, JOB_STATUS, JOB_PROGRESS}
     bool getInfo(QList<QByteArray> data, MTCPSocket* socket);
 
+    // CHANGING FUNCTIONS FOR BOTH ADMINS:
+    // changeUserPassword   Syntax of comand:   CHANGE_USER_PASSWORD NAME NEW_PASSWORD
+    //                                          CHANGE_USER_PASSWORD leonid trewq
+    bool changeUserPassword(QList<QByteArray> data, MTCPSocket* socket);
+    // changeUserCategories Syntax of comand:   CHANGE_USER_CATEGORIES NAME NEW_CATEGORIES
+    //                                          CHANGE_USER_CATEGORIES leonid all,office,hill
+    bool changeUserCategories(QList<QByteArray> data, MTCPSocket* socket);
+
 signals:
 
 };

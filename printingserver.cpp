@@ -52,6 +52,9 @@ void printingServer::initFunctionsVector()
     commandFunctionsVector.push_back(commandFunction{"GET_USERS", int(mUser::ADMIN), &printingServer::getUsers});
     commandFunctionsVector.push_back(commandFunction{"GET_CATEGORIES", int(mUser::ADMIN), &printingServer::getCategories});
     commandFunctionsVector.push_back(commandFunction{"GET_INFO", int(mUser::ADMIN), &printingServer::getInfo});
+    //Admin`s changers
+    commandFunctionsVector.push_back(commandFunction{"CHANGE_USER_PASSWORD", int(mUser::ADMIN), &printingServer::changeUserPassword});
+    commandFunctionsVector.push_back(commandFunction{"CHANGE_USER_CATEGORIES", int(mUser::ADMIN), &printingServer::changeUserCategories});
 }
 
 bool printingServer::start()
@@ -145,7 +148,7 @@ void printingServer::newConnection()
 
     container->push_back(new MTCPSocket(tcpSocket, name, type));
     connect(container->back(), &MTCPSocket::readyRead, this, &printingServer::readyRead);
-    connect(container->back(), &MTCPSocket::readyRead, this, &printingServer::clientDisconnected);
+    connect(container->back(), &MTCPSocket::disconnected, this, &printingServer::clientDisconnected);
 }
 
 void printingServer::readyRead()
@@ -329,7 +332,7 @@ bool printingServer::createUser(QList<QByteArray> data, MTCPSocket *socket)
             else if(categoryAvailable == m_availableCategories.back() && part != categoryAvailable)
             {
                categoriesCorrect = categoriesCorrect && false;
-               socket->socket()->write("ERROR UNKNOWN_CATEGORY");
+               socket->socket()->write("ERROR: UNKNOWN_CATEGORY");
                return false;
             }
         }
@@ -381,7 +384,7 @@ bool printingServer::getCategories(QList<QByteArray> data, MTCPSocket *socket)
 
 bool printingServer::getInfo(QList<QByteArray> data, MTCPSocket *socket)
 {
-    if(data.size() < 3)
+    if(data.size() < 2)
     {
         socket->socket()->write("ERROR NOT_ENOUGH_DATA");
         return false;
@@ -398,7 +401,7 @@ bool printingServer::getInfo(QList<QByteArray> data, MTCPSocket *socket)
 
     if(userData == nullptr)
     {
-        socket->socket()->write("ERROR NOT_FOUND");
+        socket->socket()->write("ERROR USER_NOT_FOUND");
         return false;
     }
 
@@ -442,6 +445,76 @@ bool printingServer::getInfo(QList<QByteArray> data, MTCPSocket *socket)
         }
     }
 
+    socket->socket()->write("DONE");
+    return true;
+}
+
+bool printingServer::changeUserPassword(QList<QByteArray> data, MTCPSocket *socket)
+{
+    if(data.size() < 2)
+    {
+        socket->socket()->write("ERROR NOT_ENOUGH_DATA");
+        return false;
+    }
+
+    QByteArray name = data.takeFirst();
+    QByteArray newPass = data.takeFirst();
+    QByteArray type = "USER";
+
+    if(name.isEmpty() || newPass.isEmpty())
+    {
+        socket->socket()->write("ERROR NOT_ENOUGH_DATA");
+        return false;
+    }
+
+    mUser *userData = getUserDataByName(name, type);
+
+    if(userData == nullptr)
+    {
+        socket->socket()->write("ERROR USER_NOT_FOUND");
+        return false;
+    }
+
+    userData->setPass(newPass);
+    updateUsers();
+    socket->socket()->write("DONE");
+    return true;
+}
+
+bool printingServer::changeUserCategories(QList<QByteArray> data, MTCPSocket *socket)
+{
+    if(data.size() < 2)
+    {
+        socket->socket()->write("ERROR NOT_ENOUGH_DATA");
+        return false;
+    }
+
+    QByteArray name = data.takeFirst();
+    QByteArray newCategories = data.takeFirst();
+    QByteArray type = "USER";
+
+    if(name.isEmpty() || newCategories.isEmpty())
+    {
+        socket->socket()->write("ERROR NOT_ENOUGH_DATA");
+        return false;
+    }
+
+    mUser *userData = getUserDataByName(name, type);
+
+    if(userData == nullptr)
+    {
+        socket->socket()->write("ERROR USER_NOT_FOUND");
+        return false;
+    }
+
+    if(mUser::checkCategories(newCategories) == false)
+    {
+        socket->socket()->write("ERROR: UNKNOWN_CATEGORY");
+        return false;
+    }
+
+    userData->setCategory(newCategories);
+    updateUsers();
     socket->socket()->write("DONE");
     return true;
 }

@@ -34,6 +34,12 @@ public:
     static QString enumToString (const mUserType value);
     static mUserType stringToEnum (const QString &key);
 
+    static bool checkCategories(const QString &categories);
+
+    void setPass(const QString &newPass);
+
+    void setCategory(const QString &newCategory);
+
 private:
     QString m_name;
     QString m_pass;

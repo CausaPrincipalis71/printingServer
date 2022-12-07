@@ -106,6 +106,44 @@ mUser::mUserType mUser::stringToEnum(const QString &key)
     return static_cast<mUserType>(QMetaEnum::fromType<mUser::mUserType>().keyToValue(key.toLatin1().data()));
 }
 
+bool mUser::checkCategories(const QString &data)
+{
+    QStringList availableCategories = getCategories();
+    auto categories = data.split(',');
+
+    foreach(const auto &checkedCategory, categories)
+    {
+        foreach(const auto &availableCategory, availableCategories)
+        {
+            if(checkedCategory == availableCategory)
+                break;
+            else if(checkedCategory != availableCategory && availableCategory == availableCategories.last())
+                return false;
+        }
+    }
+
+    return true;
+}
+
+void mUser::setPass(const QString &newPass)
+{
+    m_pass = newPass;
+
+    QString textType = enumToString(m_type);
+
+    QSettings data(programName, textType.toLower());
+    data.beginGroup(m_name);
+    data.setValue("pass", newPass);
+    data.endGroup();
+
+    return;
+}
+
+void mUser::setCategory(const QString &newCategory)
+{
+    m_category = newCategory;
+}
+
 mUser::mUserType operator|(mUser::mUserType a, mUser::mUserType b)
 {
     return static_cast<mUser::mUserType>(static_cast<int>(a) | static_cast<int>(b));
