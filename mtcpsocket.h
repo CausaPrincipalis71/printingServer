@@ -10,14 +10,13 @@ class MTCPSocket : public QObject
 {
     Q_OBJECT
 public:
-    explicit MTCPSocket(QTcpSocket* socket, QString& name, mUserType type, QObject *parent = nullptr);
+    explicit MTCPSocket(QTcpSocket* socket, QString& name, mUser::mUserType type, QObject *parent = nullptr);
     ~MTCPSocket();
 
     QTcpSocket *socket() const;
 
     const QString &name() const;
-
-    mUserType type() const;
+    mUser::mUserType type() const;
 
 signals:
     void readyRead();
@@ -30,7 +29,7 @@ private slots:
 private:
     QTcpSocket* m_socket;
     QString m_name;
-    mUserType m_type;
+    mUser::mUserType m_type;
 };
 
 #endif // MTCPSOCKET_H

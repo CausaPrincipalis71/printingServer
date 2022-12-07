@@ -2,98 +2,78 @@
 
 const QString mUser::programName = "MPrintingServer";
 
-QString getTypeText(mUserType type)
+mUser::mUser(const QString &name, const QString &pass, mUser::mUserType type, const QString &category, QObject *parent) : QObject(parent),
+    m_name(name),
+    m_pass(pass),
+    m_type(type),
+    m_category(category)
+{}
+
+QVector<mUser*> mUser::getByType(QString typeName)
 {
-    QString textType;
-    switch(type)
-    {
-        case ADMIN:
-            textType="admin";
-            break;
-
-        case USER:
-            textType="user";
-            break;
-
-        case PRINTER:
-            textType="printer";
-            break;
-    }
-    return textType;
-}
-
-mUserType getTypeEnum(QString type)
-{
-    mUserType enumType;
-
-    if(type == "admin")
-        enumType=ADMIN;
-
-    else if (type == "user")
-        enumType=USER;
-
-    else if (type == "printer")
-        enumType=PRINTER;
-
-    return enumType;
-}
-
-mUser::mUser(QString &name, QString &pass, mUserType type, QString &category)
-{
-    m_name = name;
-    m_pass = pass;
-    m_type = type;
-    m_category = category;
-}
-
-QVector<mUser> mUser::getByType(QString typeName)
-{
-    QSettings data(programName, typeName);
-    QVector<mUser> dataVector;
+    QSettings data(programName, typeName.toLower());
+    QVector<mUser*> dataVector;
 
     for(const auto& i : data.childGroups())
     {
         data.beginGroup(i);
         QString name = i;
         QString pass = data.value("pass").toString();
-        mUserType type = getTypeEnum(data.value("type").toString());
+        mUserType type = stringToEnum(data.value("type").toString());
         QString category = data.value("category").toString();
         data.endGroup();
 
-        dataVector.push_back(mUser(name, pass, type, category));
+        dataVector.push_back(new mUser(name, pass, type, category));
     }
 
     return dataVector;
 }
 
-QVector<mUser> mUser::getAdmins()
+QVector<mUser*> mUser::getAdmins()
 {
-    return getByType("admin");
+    return getByType("ADMIN");
 }
 
-QVector<mUser> mUser::getUsers()
+QVector<mUser*> mUser::getUsers()
 {
-    return getByType("user");
+    return getByType("USER");
 }
 
-QVector<mUser> mUser::getPrinters()
+QVector<mUser*> mUser::getPrinters()
 {
-    return getByType("printer");
+    return getByType("PRINTER");
+}
+
+QStringList mUser::getCategories()
+{
+    QSettings data(programName, "categories");
+    return data.childGroups();
 }
 
 mUser mUser::addNewUser(QString name, QString pass, mUserType type, QString category)
 {
-    QString textType = getTypeText(type);
+    QString textType = enumToString(type);
 
-    QSettings data(programName, textType);
+    QSettings data(programName, textType.toLower());
 
     data.beginGroup(name);
-    data.setValue("pass", pass);
     data.setValue("type", textType);
     data.setValue("category", category);
+    data.setValue("pass", pass);
     data.endGroup();
 
     return mUser(name, pass, type, category);
+}
+
+QString mUser::addNewCategory(QString name)
+{
+    QSettings data(programName, "categories");
+
+    data.beginGroup(name);
+    data.setValue("active", "true");
+    data.endGroup();
+
+    return name;
 }
 
 const QString &mUser::name() const
@@ -106,7 +86,7 @@ const QString &mUser::pass() const
     return m_pass;
 }
 
-const mUserType mUser::type() const
+const mUser::mUserType mUser::type() const
 {
     return m_type;
 }
@@ -114,4 +94,24 @@ const mUserType mUser::type() const
 const QString &mUser::category() const
 {
     return m_category;
+}
+
+QString mUser::enumToString(const mUser::mUserType value)
+{
+    return QMetaEnum::fromType<mUser::mUserType>().valueToKey(value);
+}
+
+mUser::mUserType mUser::stringToEnum(const QString &key)
+{
+    return static_cast<mUserType>(QMetaEnum::fromType<mUser::mUserType>().keyToValue(key.toLatin1().data()));
+}
+
+mUser::mUserType operator|(mUser::mUserType a, mUser::mUserType b)
+{
+    return static_cast<mUser::mUserType>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+mUser::mUserType operator&(mUser::mUserType a, mUser::mUserType b)
+{
+    return static_cast<mUser::mUserType>(static_cast<int>(a) & static_cast<int>(b));
 }

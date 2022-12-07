@@ -20,7 +20,10 @@ int main(int argc, char *argv[])
 
     printingServer MServer(port);
     if(MServer.start() == 0)
+    {
         qCritical() << "PrintingServer ERROR: Server cannot listen on port" << MServer.port();
+        return 1;
+    }
 
     return a.exec();
 }

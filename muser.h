@@ -4,19 +4,25 @@
 #include <QObject>
 #include <QSettings>
 #include <QVector>
+#include <QMetaEnum>
 
-enum mUserType {ADMIN, USER, PRINTER};
-
-class mUser
+class mUser : public QObject
 {
-public:
-    mUser(QString &name, QString &pass, mUserType type, QString &category);
+Q_OBJECT
 
-    static QVector<mUser> getAdmins();
-    static QVector<mUser> getUsers();
-    static QVector<mUser> getPrinters();
+public:
+    enum mUserType {ADMIN = 1 << 0, USER = 1 << 1, PRINTER = 1 << 2};
+    Q_ENUM(mUserType)
+
+    mUser(const QString &name, const QString &pass, mUserType type, const QString &category, QObject *parent = nullptr);
+
+    static QVector<mUser*> getAdmins();
+    static QVector<mUser*> getUsers();
+    static QVector<mUser*> getPrinters();
+    static QStringList getCategories();
 
     static mUser addNewUser(QString name, QString pass, mUserType type, QString category);
+    static QString addNewCategory(QString name);
 
     const QString &name() const;
     const QString &pass() const;
@@ -24,13 +30,17 @@ public:
     const QString &category() const;
 
     static const QString programName;
+
+    static QString enumToString (const mUserType value);
+    static mUserType stringToEnum (const QString &key);
+
 private:
     QString m_name;
     QString m_pass;
     mUserType m_type;
     QString m_category;
 
-    static QVector<mUser> getByType(QString typeName);
+    static QVector<mUser *> getByType(QString typeName);
 };
 
 #endif // MUSER_H
