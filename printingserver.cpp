@@ -7,8 +7,13 @@ printingServer::printingServer(quint16 port, QObject *parent)
 
     updateAdmins();
     updateUsers();
-    updateAdmins();
+    updatePrinters();
     updateCategories();
+
+    updater = new QTimer();
+    updater->setSingleShot(false);
+    connect(updater, &QTimer::timeout, this, &printingServer::updateJobs);
+    updater->start(1000);
 
     initFunctionsVector();
 }
@@ -47,14 +52,20 @@ void printingServer::initFunctionsVector()
 {
     //Admin`s setters
     commandFunctionsVector.push_back(commandFunction{"CREATE_USER", int(mUser::ADMIN), &printingServer::createUser});
-    commandFunctionsVector.push_back(commandFunction{"CREATE_GROUP", int(mUser::ADMIN), &printingServer::createGroup});
+    commandFunctionsVector.push_back(commandFunction{"CREATE_GROUP", int(mUser::ADMIN), &printingServer::createCategory});
     //Admin`s getters
     commandFunctionsVector.push_back(commandFunction{"GET_USERS", int(mUser::ADMIN), &printingServer::getUsers});
     commandFunctionsVector.push_back(commandFunction{"GET_CATEGORIES", int(mUser::ADMIN), &printingServer::getCategories});
-    commandFunctionsVector.push_back(commandFunction{"GET_INFO", int(mUser::ADMIN), &printingServer::getInfo});
+    commandFunctionsVector.push_back(commandFunction{"GET_USER_INFO", int(mUser::ADMIN), &printingServer::getUserInfo});
+    commandFunctionsVector.push_back(commandFunction{"GET_ONLINE", int(mUser::ADMIN), &printingServer::getOnline});
+    //Admin`s and users getters
+    commandFunctionsVector.push_back(commandFunction{"GET_PRINTERS", int(mUser::ADMIN | mUser::USER), &printingServer::getPrinters});
+    commandFunctionsVector.push_back(commandFunction{"GET_PRINTER_INFO", int(mUser::ADMIN | mUser::USER), &printingServer::getPrinterInfo});
     //Admin`s changers
     commandFunctionsVector.push_back(commandFunction{"CHANGE_USER_PASSWORD", int(mUser::ADMIN), &printingServer::changeUserPassword});
-    commandFunctionsVector.push_back(commandFunction{"CHANGE_USER_CATEGORIES", int(mUser::ADMIN), &printingServer::changeUserCategories});
+    commandFunctionsVector.push_back(commandFunction{"CHANGE_USER_CATEGORY", int(mUser::ADMIN), &printingServer::changeUserCategory});
+    //Jobs functions
+    commandFunctionsVector.push_back(commandFunction{"CREATE_JOB", int(mUser::ADMIN | mUser::USER), &printingServer::createJob});
 }
 
 bool printingServer::start()
@@ -203,7 +214,7 @@ void printingServer::clientDisconnected()
     }
 }
 
-QVector<MTCPSocket *> *printingServer::getContainerByType(QByteArray &type)
+QVector<MTCPSocket *> *printingServer::getContainerByType(const QByteArray &type)
 {
     QVector<MTCPSocket *> *container = nullptr;
     if(type == "ADMIN")
@@ -222,7 +233,7 @@ QVector<MTCPSocket *> *printingServer::getContainerByType(QByteArray &type)
     return container;
 }
 
-QVector<mUser *> *printingServer::getContainerDataByType(QByteArray &type)
+QVector<mUser *> *printingServer::getContainerDataByType(const QByteArray &type)
 {
     QVector<mUser *> *container = nullptr;
     if(type == "ADMIN")
@@ -241,7 +252,7 @@ QVector<mUser *> *printingServer::getContainerDataByType(QByteArray &type)
     return container;
 }
 
-MTCPSocket *printingServer::getUserByName(QByteArray &name, QByteArray &type)
+MTCPSocket *printingServer::getUserByName(const QByteArray &name, const QByteArray &type)
 {
     QVector<MTCPSocket*> *container = getContainerByType(type);
     MTCPSocket *user = nullptr;
@@ -258,13 +269,30 @@ MTCPSocket *printingServer::getUserByName(QByteArray &name, QByteArray &type)
     return user;
 }
 
-mUser *printingServer::getUserDataByName(QByteArray &name, QByteArray &type)
+QVector<MTCPSocket *> printingServer::getUsersByCategory(const QByteArray &category, const QByteArray &type)
 {
-    QVector<mUser*> *containerData = getContainerDataByType(type);
+    QVector<MTCPSocket*> *container = getContainerByType(type);
+    QVector<MTCPSocket*> users;
+
+    foreach(const auto &i, *container)
+    {
+        mUser *user = getUserDataByName(i->name(), mUser::enumToString(i->type()));
+        if(user->category() == category)
+        {
+            users.push_back(i);
+        }
+    }
+
+    return users;
+}
+
+mUser *printingServer::getUserDataByName(const QByteArray *name, const QByteArray *type)
+{
+    QVector<mUser*> *containerData = getContainerDataByType(*type);
     mUser *userData = nullptr;
     foreach(const auto &i, *containerData)
     {
-        if(i->name() == name)
+        if(i->name() == *name)
         {
             userData = i;
             break;
@@ -272,6 +300,63 @@ mUser *printingServer::getUserDataByName(QByteArray &name, QByteArray &type)
     }
 
     return userData;
+}
+
+mUser *printingServer::getUserDataByName(const QByteArray name, const QByteArray type)
+{
+    return getUserDataByName(&name, &type);
+}
+
+mUser *printingServer::getUserDataByName(const QString &name, const QString &type)
+{
+    return getUserDataByName(name.toLatin1(), type.toLatin1());
+}
+
+QVector<mUser *> printingServer::getUsersDataByCategory(const QByteArray &category, const QByteArray &type)
+{
+    QVector<mUser*> *containerData = getContainerDataByType(type);
+    QVector<mUser*> users;
+    foreach(auto const &user, *containerData)
+    {
+        if(user->category().contains(category))
+            users.push_back(user);
+    }
+
+    return users;
+}
+
+void printingServer::updateJobs()
+{
+    QByteArray type = "PRINTER";
+    for (int i = 0; i < m_queryJobs.size(); i++)
+    {
+        const auto &task = m_queryJobs.at(i);
+        QByteArray category = task->category();
+        QVector<MTCPSocket*> container = getUsersByCategory(category, type);
+        QVector<MTCPSocket*> availablePrinters;
+        QVector<mUser*> availablePrintersData;
+        foreach(const auto &printer, container)
+        {
+            mUser *user = getUserDataByName(printer->name(), mUser::enumToString(printer->type()));
+            if(user->category() == category && user->isBusy() == false)
+            {
+                availablePrinters.push_back(printer);
+                availablePrintersData.push_back(user);
+                if(availablePrinters.size() >= task->maxSplits())
+                    break;
+            }
+        }
+
+        if(availablePrinters.size() > 0)
+        {
+            task->setPerformerPrinters(availablePrinters);
+            task->setPerformerPrintersData(availablePrintersData);
+            task->executeTask();
+            m_currentJobs.push_back(task);
+            m_queryJobs.removeAt(i);
+            i--;
+        }
+    }
 }
 
 void printingServer::wrongConnection(QTcpSocket *tcpSocket)
@@ -344,7 +429,7 @@ bool printingServer::createUser(QList<QByteArray> data, MTCPSocket *socket)
     return true;
 }
 
-bool printingServer::createGroup(QList<QByteArray> data, MTCPSocket *socket)
+bool printingServer::createCategory(QList<QByteArray> data, MTCPSocket *socket)
 {
     if(data.size() < 1 || data.at(0).isEmpty())
     {
@@ -382,18 +467,15 @@ bool printingServer::getCategories(QList<QByteArray> data, MTCPSocket *socket)
     return true;
 }
 
-bool printingServer::getInfo(QList<QByteArray> data, MTCPSocket *socket)
+bool printingServer::getUserInfo(QList<QByteArray> data, MTCPSocket *socket)
 {
     if(data.size() < 2)
     {
         socket->socket()->write("ERROR NOT_ENOUGH_DATA");
         return false;
     }
-    auto type = data.at(0);
-    data.pop_front();
-
-    auto name = data.at(0);
-    data.pop_front();
+    auto name = data.takeFirst();
+    QByteArray type = "USER";
 
     mUser *userData = getUserDataByName(name, type);
     MTCPSocket *user = getUserByName(name, type);
@@ -408,42 +490,124 @@ bool printingServer::getInfo(QList<QByteArray> data, MTCPSocket *socket)
     if(user != nullptr)
         userState = "ONLINE";
 
-    if(type == "USER")
+    foreach(const auto &request, data)
     {
-        foreach(const auto &request, data)
+        if(request == "CATEGORY")
         {
-            if(request == "CATEGORY")
-            {
-                socket->socket()->write((userData->category() + "\n").toLatin1());
-            }
-            else if(request == "CONNECTION_STATE")
-            {
-                socket->socket()->write((userState + "\n").toLatin1());
-            }
-            else
-            {
-                socket->socket()->write("WARNING: " + request + " IS_UNKNOWN\n");
-            }
+            socket->socket()->write((userData->category() + "\n").toLatin1());
+        }
+        else if(request == "CONNECTION_STATE")
+        {
+            socket->socket()->write((userState + "\n").toLatin1());
+        }
+        else
+        {
+            socket->socket()->write("WARNING: " + request + " IS_UNKNOWN\n");
         }
     }
-    else if(type == "PRINTER")
+
+    socket->socket()->write("DONE");
+    return true;
+}
+
+bool printingServer::getPrinterInfo(QList<QByteArray> data, MTCPSocket *socket)
+{
+    if(data.size() < 2)
     {
-        foreach(const auto &request, data)
+        socket->socket()->write("ERROR NOT_ENOUGH_DATA");
+        return false;
+    }
+    auto name = data.takeFirst();
+    QByteArray type = "PRINTER";
+
+    mUser *userData = getUserDataByName(name, type);
+    MTCPSocket *user = getUserByName(name, type);
+    QString userState = "OFFLINE";
+
+    if(userData == nullptr)
+    {
+        socket->socket()->write("ERROR USER_NOT_FOUND");
+        return false;
+    }
+
+    if(user != nullptr)
+        userState = "ONLINE";
+
+    foreach(const auto &request, data)
+    {
+        if(request == "CATEGORY")
         {
-            if(request == "CATEGORY")
-            {
-                socket->socket()->write((userData->category().split(',').at(0) + "\n").toLatin1());
-            }
-            else if(request == "CONNECTION_STATE")
-            {
-                socket->socket()->write((userState + "\n").toLatin1());
-            }
-            else
-            {
-                socket->socket()->write("WARNING: " + request + " IS_UNKNOWN\n");
-            }
+            socket->socket()->write((userData->category().split(',').at(0) + "\n").toLatin1());
+        }
+        else if(request == "CONNECTION_STATE")
+        {
+            socket->socket()->write((userState + "\n").toLatin1());
+        }
+        else
+        {
+            socket->socket()->write("WARNING: " + request + " IS_UNKNOWN\n");
         }
     }
+
+    socket->socket()->write("DONE");
+    return true;
+}
+
+bool printingServer::getOnline(QList<QByteArray> data, MTCPSocket *socket)
+{
+    if(data.size() < 1)
+    {
+        socket->socket()->write("ERROR NOT_ENOUGH_DATA");
+        return false;
+    }
+
+    if(data.contains("ALL"))
+    {
+        foreach(const auto &container, m_all)
+        {
+            if(container->isEmpty())
+                continue;
+            socket->socket()->write((mUser::enumToString(container->first()->type()) + "\n").toLatin1());
+            foreach (auto const &user, *container)
+            {
+                socket->socket()->write((user->name() + "\n").toLatin1());
+            }
+        }
+        socket->socket()->write("DONE");
+        return true;
+    }
+
+    foreach (const auto &type, data)
+    {
+        QVector<MTCPSocket *> *container = nullptr;
+
+        if(type == "USER")
+            container = &m_users;
+        else if(type == "ADMIN")
+            container = &m_admins;
+        else if(type == "PRINTER")
+            container = &m_printers;
+        else
+        {
+            socket->socket()->write("ERROR: UNKNOWN_TYPE " + type);
+            return false;
+        }
+
+        socket->socket()->write(type + "\n");
+        foreach (const auto &user, *container)
+        {
+            socket->socket()->write((user->name() + "\n").toLatin1());
+        }
+    }
+
+    socket->socket()->write("DONE");
+    return true;
+}
+
+bool printingServer::getPrinters(QList<QByteArray> data, MTCPSocket *socket)
+{
+    foreach(const auto &user, m_printersData)
+        socket->socket()->write((user->name() + "\n").toLatin1());
 
     socket->socket()->write("DONE");
     return true;
@@ -481,7 +645,7 @@ bool printingServer::changeUserPassword(QList<QByteArray> data, MTCPSocket *sock
     return true;
 }
 
-bool printingServer::changeUserCategories(QList<QByteArray> data, MTCPSocket *socket)
+bool printingServer::changeUserCategory(QList<QByteArray> data, MTCPSocket *socket)
 {
     if(data.size() < 2)
     {
@@ -515,6 +679,45 @@ bool printingServer::changeUserCategories(QList<QByteArray> data, MTCPSocket *so
 
     userData->setCategory(newCategories);
     updateUsers();
+    socket->socket()->write("DONE");
+    return true;
+}
+
+bool printingServer::createJob(QList<QByteArray> data, MTCPSocket *socket)
+{
+    if(data.size() < 3)
+    {
+        socket->socket()->write("ERROR NOT_ENOUGH_DATA");
+        return false;
+    }
+
+    QByteArray name = data.takeFirst();
+    QByteArray category = data.takeFirst().split(',').first();
+    int maxParts = data.takeFirst().toInt();
+    mUser *user = getUserDataByName(socket->name(), mUser::enumToString(socket->type()));
+
+    if(name.isEmpty() || category.isEmpty() || maxParts == 0)
+    {
+        socket->socket()->write("ERROR NOT_ENOUGH_DATA");
+        return false;
+    }
+
+    if(mUser::getCategories().contains(category) == 0)
+    {
+        socket->socket()->write("ERROR: UNKNOWN_CATEGORY: " + category);
+        return false;
+    }
+
+    // If user not inside category, then restirct creating of jobs
+    // It doesn't matter to the admin or user with "all" category
+    if(user->category().contains(category) == 0 && user->type() == mUser::USER && user->category().contains("all" ) == 0)
+    {
+        socket->socket()->write("ERROR: ACCESS_RESTRICTED " + category);
+        return false;
+    }
+
+    m_queryJobs.push_back(new mPrinterJob(name, category, maxParts));
+    updateJobs();
     socket->socket()->write("DONE");
     return true;
 }

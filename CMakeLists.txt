@@ -21,6 +21,7 @@ add_executable(PrintingServer
   printingserver.h printingserver.cpp
   muser.h muser.cpp
   mtcpsocket.h mtcpsocket.cpp
+  mprinterjob.h mprinterjob.cpp
 )
 target_link_libraries(PrintingServer Qt${QT_VERSION_MAJOR}::Core Qt6::Network)
 

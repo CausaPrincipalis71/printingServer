@@ -5,8 +5,10 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QSettings>
+#include <QTimer>
 #include "muser.h"
-#include <mtcpsocket.h>
+#include "mtcpsocket.h"
+#include "mprinterjob.h"
 
 class printingServer : public QObject
 {
@@ -23,6 +25,8 @@ private slots:
     void readyRead();
     void clientDisconnected();
 
+    void updateJobs();
+
 private:
     QTcpServer * m_server;
     quint16 m_port;
@@ -30,6 +34,7 @@ private:
     QVector<MTCPSocket*> m_users;
     QVector<MTCPSocket*> m_admins;
     QVector<MTCPSocket*> m_printers;
+    QVector<QVector<MTCPSocket*> *> m_all = {&m_admins, &m_users, &m_printers};
 
     QVector<mUser*> m_printersData;
     QVector<mUser*> m_adminsData;
@@ -37,11 +42,23 @@ private:
 
     QStringList m_availableCategories;
 
-    QVector<MTCPSocket *> *getContainerByType(QByteArray &type);
-    QVector<mUser*> *getContainerDataByType(QByteArray &type);
+    QVector<MTCPSocket *> *getContainerByType(const QByteArray &type);
+    QVector<mUser*> *getContainerDataByType(const QByteArray &type);
 
-    MTCPSocket *getUserByName(QByteArray &name, QByteArray &type);
-    mUser *getUserDataByName(QByteArray &name, QByteArray &type);
+    MTCPSocket *getUserByName(const QByteArray &name, const QByteArray &type);
+
+    QVector<MTCPSocket*> getUsersByCategory(const QByteArray &category, const QByteArray &type);
+
+    mUser *getUserDataByName(const QByteArray *name, const QByteArray *type);
+    mUser *getUserDataByName(const QByteArray name, const QByteArray type);
+    mUser *getUserDataByName(const QString &name, const QString &type);
+
+    QVector<mUser*> getUsersDataByCategory(const QByteArray &category, const QByteArray &type);
+
+    QVector<mPrinterJob *> m_queryJobs;
+    QVector<mPrinterJob *> m_currentJobs;
+
+    QTimer *updater;
 
     // Updating data on subjects and objects of the system
     void updateUsers();
@@ -67,15 +84,14 @@ private:
 
     // Client Command Processing Functions
     // CREATION FUNCTIONS FOR ADMINS:
-
     // createUser           Syntax of command:   CREATE_USER NAME PASSWORD TYPE CATEGORIES
     //                                           CREATE_USER user qwerty USER hall,factory1,office
     //                                           CREATE_USER printer1 1 PRINTER factory1
     bool createUser(QList<QByteArray> data, MTCPSocket* socket);
-    // createGroup           Syntax of command:  CREATE_GROUP NAME
-    //                                           CREATE_GROUP hall
-    //                                           CREATE_GROUP office factory
-    bool createGroup(QList<QByteArray> data, MTCPSocket* socket);
+    // createCategory       Syntax of command:   CREATE_CATEGORY NAME
+    //                                           CREATE_CATEGORY hall
+    //                                           CREATE_CATEGORY office factory
+    bool createCategory(QList<QByteArray> data, MTCPSocket* socket);
 
     // GETTERS FUNCTIONS FOR ADMINS
     // getUsers          Syntax of command:  GET_USERS
@@ -84,17 +100,31 @@ private:
     // getCategories     Syntax of command:  GET_CATEGORIES
     //                                       Without arguments
     bool getCategories(QList<QByteArray> data, MTCPSocket* socket);
-    // getInfo           Syntax of command: GET_INFO USER NAME {CATEGORY, CONNECTION_STATE}
-    //                                      GET_INFO PRINTER NAME {CATEGORY, CONNECTION_STATE, JOB_STATUS, JOB_PROGRESS}
-    bool getInfo(QList<QByteArray> data, MTCPSocket* socket);
+    // getInfo           Syntax of command: GET_USER_INFO  NAME {CATEGORY, CONNECTION_STATE}
+    bool getUserInfo(QList<QByteArray> data, MTCPSocket* socket);
+    // getOnline         Syntax of command: GET_ONLINE {ALL, USER, ADMIN, PRINTER}
+    bool getOnline(QList<QByteArray> data, MTCPSocket* socket);
 
-    // CHANGING FUNCTIONS FOR BOTH ADMINS:
+    // GETTERS FUNCTIONS FOR BOTH ADMINS AND USERS
+    // getUsers          Syntax of command:  GET_PRINTERS
+    //                                       Without arguments
+    bool getPrinters(QList<QByteArray> data, MTCPSocket* socket);
+    // getPrinterInfo    Syntax of command:  GET_USER_INFO PRINTER NAME {CATEGORY, CONNECTION_STATE, JOB_STATUS, JOB_PROGRESS}
+    bool getPrinterInfo(QList<QByteArray> data, MTCPSocket* socket);
+
+    // CHANGING FUNCTIONS FOR BOTH ADMINS AND USERS:
     // changeUserPassword   Syntax of comand:   CHANGE_USER_PASSWORD NAME NEW_PASSWORD
     //                                          CHANGE_USER_PASSWORD leonid trewq
     bool changeUserPassword(QList<QByteArray> data, MTCPSocket* socket);
-    // changeUserCategories Syntax of comand:   CHANGE_USER_CATEGORIES NAME NEW_CATEGORIES
-    //                                          CHANGE_USER_CATEGORIES leonid all,office,hill
-    bool changeUserCategories(QList<QByteArray> data, MTCPSocket* socket);
+    // changeUserCategory   Syntax of comand:   CHANGE_USER_CATEGORY NAME NEW_CATEGORIES
+    //                                          CHANGE_USER_CATEGORY leonid all,office,hill
+    bool changeUserCategory(QList<QByteArray> data, MTCPSocket* socket);
+
+    // JOB FUNCTIONS FOR BOTH ADMINS AND USERS:
+    // createJob            Syntax of comand:   CREATE_JOB NAME CATEGORY MAX_PARTS
+    //                                          CREATE_JOB body_1231 hall 4
+    bool createJob(QList<QByteArray> data, MTCPSocket* socket);
+
 
 signals:
 

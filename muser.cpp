@@ -142,6 +142,54 @@ void mUser::setPass(const QString &newPass)
 void mUser::setCategory(const QString &newCategory)
 {
     m_category = newCategory;
+
+    QString textType = enumToString(m_type);
+
+    QSettings data(programName, textType.toLower());
+    data.beginGroup(m_name);
+    data.setValue("category", newCategory);
+    data.endGroup();
+
+    return;
+}
+
+bool mUser::isBusy() const
+{
+    return m_isBusy;
+}
+
+void mUser::setIsBusy(bool newIsBusy)
+{
+    m_isBusy = newIsBusy;
+
+    if(m_isBusy == false)
+        m_jobState = 0;
+}
+
+int mUser::jobState() const
+{
+    return m_jobState;
+}
+
+void mUser::setJobState(int newJobState)
+{
+    m_jobState = newJobState;
+
+    if(m_jobState >= 100)
+    {
+        m_jobState = 0;
+        m_isBusy = false;
+    }
+}
+
+const QString &mUser::jobName() const
+{
+    return m_jobName;
+}
+
+void mUser::setJobName(const QString &newJobName)
+{
+    m_jobName = newJobName;
 }
 
 mUser::mUserType operator|(mUser::mUserType a, mUser::mUserType b)

@@ -40,11 +40,24 @@ public:
 
     void setCategory(const QString &newCategory);
 
+    bool isBusy() const;
+    void setIsBusy(bool newIsBusy);
+
+    int jobState() const;
+    void setJobState(int newJobState);
+
+    const QString &jobName() const;
+    void setJobName(const QString &newJobName);
+
 private:
     QString m_name;
     QString m_pass;
     mUserType m_type;
     QString m_category;
+
+    bool m_isBusy;
+    int m_jobState;
+    QString m_jobName;
 
     static QVector<mUser *> getByType(QString typeName);
 };
