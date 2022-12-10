@@ -57,6 +57,16 @@ private:
 
     QVector<mPrinterJob *> m_queryJobs;
     QVector<mPrinterJob *> m_currentJobs;
+    QVector<mPrinterJob *> m_completedJobs;
+    QVector<QVector <mPrinterJob *> *> m_jobVectors;
+
+    QVector<mPrinterJob *> *getJobsContainerByState(mPrinterJob::mWorkType state);
+    QVector<mPrinterJob *> *getJobsContainerByState(QByteArray state);
+    mPrinterJob *getJobByName(QByteArray &workState, QByteArray name);
+    mPrinterJob *getJobByName(QByteArray &workState, QString &name);
+    mPrinterJob *getJobByName(mPrinterJob::mWorkType workState, QByteArray &name);
+
+    mPrinterJob *getAnyJobByName(QByteArray &name);
 
     QTimer *updater;
 
@@ -109,7 +119,7 @@ private:
     // getUsers          Syntax of command:  GET_PRINTERS
     //                                       Without arguments
     bool getPrinters(QList<QByteArray> data, MTCPSocket* socket);
-    // getPrinterInfo    Syntax of command:  GET_USER_INFO PRINTER NAME {CATEGORY, CONNECTION_STATE, JOB_STATUS, JOB_PROGRESS}
+    // getPrinterInfo    Syntax of command:  GET_USER_INFO PRINTER NAME {CATEGORY, CONNECTION_STATE, JOB_STATUS, JOB_PROGRESS, ALL}
     bool getPrinterInfo(QList<QByteArray> data, MTCPSocket* socket);
 
     // CHANGING FUNCTIONS FOR BOTH ADMINS AND USERS:
@@ -124,6 +134,23 @@ private:
     // createJob            Syntax of comand:   CREATE_JOB NAME CATEGORY MAX_PARTS
     //                                          CREATE_JOB body_1231 hall 4
     bool createJob(QList<QByteArray> data, MTCPSocket* socket);
+    // getQueryJobs         Syntax of command:  GET_QUERY_JOBS
+    //                                          Without arguments
+    bool getQueryJobs(QList<QByteArray> data, MTCPSocket* socket);
+    // getCurrentJobs       Syntax of command:  GET_CURRENT_JOBS
+    //                                          Without arguments
+    bool getCurrentJobs(QList<QByteArray> data, MTCPSocket* socket);
+    // getCompletedJobs     Syntax of command:  GET_COMPLETED_JOBS
+    //                                          Without arguments
+    bool getCompletedJobs(QList<QByteArray> data, MTCPSocket* socket);
+
+    // getJobInfo           Syntax of command:  GET_JOB_INFO NAME {PERFORMERS, MAX_SPLITS, ACTUAL_SPLITS, JOB_STATE, PROGRESS, ALL}
+    bool getJobInfo(QList<QByteArray> data, MTCPSocket* socket);
+
+    // JOB FUNCTIONS FOR PRINTERS
+    // sendProgress         Syntax of command:  SEND_PROGRESS TASK_NAME STATE
+    //                                          SEND_PROGRESS body 55
+    bool sendProgress(QList<QByteArray> data, MTCPSocket* socket);
 
 
 signals:

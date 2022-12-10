@@ -174,12 +174,6 @@ int mUser::jobState() const
 void mUser::setJobState(int newJobState)
 {
     m_jobState = newJobState;
-
-    if(m_jobState >= 100)
-    {
-        m_jobState = 0;
-        m_isBusy = false;
-    }
 }
 
 const QString &mUser::jobName() const

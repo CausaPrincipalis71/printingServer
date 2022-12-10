@@ -55,8 +55,8 @@ private:
     mUserType m_type;
     QString m_category;
 
-    bool m_isBusy;
-    int m_jobState;
+    bool m_isBusy = 0;
+    int m_jobState = 0;
     QString m_jobName;
 
     static QVector<mUser *> getByType(QString typeName);
