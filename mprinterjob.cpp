@@ -40,14 +40,14 @@ void mPrinterJob::executeTask(const QVector<MTCPSocket *> &newPerformerPrinters)
         mUser *user = m_performerPrintersData.at(i);
         user->setIsBusy(true);
         user->setJobName(m_name);
-        printer->socket()->write("NEW_JOB " + m_actualSplits);
+        printer->socket()->write(QByteArray("NEW_JOB ") + m_actualSplits + "\n");
     }
 }
 
 void mPrinterJob::updateState(mUser *performer, int currentState)
 {
     int updateState = currentState - performer->jobState();
-    performer->setJobState(currentStates);
+    performer->setJobState(currentState);
     m_progress += updateState/m_actualSplits;
 
     if(round(m_progress) >= 100)
